@@ -9,12 +9,14 @@
 namespace kiss
 {
 
+class SystemWideLockIf;
+
 // TODO: cleanup messy API
 
 class SimpleIpc
 {
   public:
-    SimpleIpc(SharedMem &sharedMemory);
+    SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &mSystemWideLock);
 
     IpcMessage &messageBufferFetch(const uint32_t dataSize);
 
@@ -47,6 +49,7 @@ class SimpleIpc
 
     Metadata *metadata;
     SharedMem &mSharedMemory;
+    SystemWideLockIf &mSystemWideLock;
 };
 
 } // namespace kiss

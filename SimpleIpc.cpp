@@ -9,8 +9,9 @@
 namespace kiss
 {
 
-SimpleIpc::SimpleIpc(SharedMem &sharedMemory) //
-    : mSharedMemory(sharedMemory)
+SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock) //
+    : mSharedMemory(sharedMemory),                                              //
+      mSystemWideLock(systemWideLock)
 {
     metadata = new (mSharedMemory.mSharedMemoryAddr) Metadata;
 }
