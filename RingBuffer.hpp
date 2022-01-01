@@ -4,75 +4,90 @@
 #include <array>
 #include <cstring>
 
+// TODO: namespace kiss
+
+enum class RingBufferResult
+{
+    OK,
+    ERR_FULL,
+    ERR_EMPTY
+};
+
 template <typename T, size_t Size> class RingBuffer
 {
+    // One entry wasted as "buffer full" marker.
     static constexpr size_t SizeWithPadding = Size + 1;
 
   public:
-    enum class Result
-    {
-        OK,
-        ERR_FULL,
-        ERR_EMPTY
-    };
-
     RingBuffer()
     {
         mHead = 0U;
         mTail = 0U;
     }
 
-    Result push(const T *data, const uint32_t count)
+    RingBufferResult push(const T *data, const uint32_t count)
     {
-        // modify only head
         const uint32_t sizeLeftCur = sizeLeft();
         if (sizeLeftCur < count)
         {
-            return Result::ERR_FULL;
+            return RingBufferResult::ERR_FULL;
         }
 
-        if ((mHead + count) < SizeWithPadding)
+        const uint32_t copyBytesCount = count * sizeof(T);
+
+        if ((mHead + copyBytesCount) < SizeWithPadding)
         {
-            (void)memcpy(&ringBuffer[mHead], data, count);
+            (void)memcpy(&ringBuffer[mHead], data, copyBytesCount);
         }
         else
         {
             const uint32_t firstCopySize = SizeWithPadding - mHead;
-            const uint32_t secondCopySize = count - firstCopySize;
+            const uint32_t secondCopySize = copyBytesCount - firstCopySize;
 
             (void)memcpy(&ringBuffer[mHead], data, firstCopySize);
             (void)memcpy(&ringBuffer[0], data + firstCopySize, secondCopySize);
         }
 
-        mHead = (mHead + count) % SizeWithPadding;
+        mHead = (mHead + copyBytesCount) % SizeWithPadding;
 
-        return Result::OK;
+        return RingBufferResult::OK;
     }
 
-    Result pop(T *data, const uint32_t count)
+    RingBufferResult push(const T *data)
     {
-        // modify only tail
+        return push(data, 1);
+    }
+
+    RingBufferResult pop(T *data, const uint32_t count)
+    {
         if (isEmpty())
         {
-            return Result::ERR_EMPTY;
+            return RingBufferResult::ERR_EMPTY;
         }
 
-        if ((mTail + count) < SizeWithPadding)
+        const uint32_t copyBytesCount = count * sizeof(T);
+
+        if ((mTail + copyBytesCount) < SizeWithPadding)
         {
-            (void)memcpy(data, &ringBuffer[mTail], count);
+            (void)memcpy(data, &ringBuffer[mTail], copyBytesCount);
         }
         else
         {
             const uint32_t firstCopySize = SizeWithPadding - mTail;
-            const uint32_t secondCopySize = count - firstCopySize;
+            const uint32_t secondCopySize = copyBytesCount - firstCopySize;
 
             (void)memcpy(data, &ringBuffer[mTail], firstCopySize);
             (void)memcpy(data + firstCopySize, &ringBuffer[0], secondCopySize);
         }
 
-        mTail = (mTail + count) % SizeWithPadding;
+        mTail = (mTail + copyBytesCount) % SizeWithPadding;
 
-        return Result::OK;
+        return RingBufferResult::OK;
+    }
+
+    RingBufferResult pop(T *data)
+    {
+        return pop(data, 1);
     }
 
   private:

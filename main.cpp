@@ -39,15 +39,15 @@ int main(int argc, char **)
             const int d = getchar();
             (void)d;
 
-            kiss::IpcMessage *msg = ipcConsumer.receiveStart();
-            if (msg != nullptr)
+            uint8_t buffer[1024] = {0};
+            auto res = ipcConsumer.receiveMessage(&buffer[0], 1024);
+            if (res == kiss::SimpleIpc::Result::OK)
             {
-                printf("Message received: %s\n", msg->getBuffer());
-                ipcConsumer.receiveEnd(msg);
+                printf("Message received: %s\n", buffer);
             }
             else
             {
-                printf("No new messages\n");
+                printf("No new messages: %d\n", (uint32_t)res);
             }
         }
     }
@@ -63,12 +63,19 @@ int main(int argc, char **)
 
             std::cout << "Sending: " << userInput << std::endl;
 
-            auto &ipcMsg = ipcProducer.messageBufferFetch(userInput.size() + 1);
-            auto *buf = ipcMsg.getBuffer();
-            (void)memcpy(buf, userInput.c_str(), userInput.size() + 1);
-            ipcProducer.sendMessage(ipcMsg);
+            userInput += '\0';
 
-            std::cout << "done" << std::endl;
+            uint8_t *userInputTest = (uint8_t *)userInput.c_str();
+
+            auto sendRes = ipcProducer.sendMessage(userInputTest, userInput.size());
+            if (sendRes != kiss::SimpleIpc::Result::OK)
+            {
+                std::cout << "send error" << std::endl;
+            }
+            else
+            {
+                std::cout << "done" << std::endl;
+            }
         }
     }
 

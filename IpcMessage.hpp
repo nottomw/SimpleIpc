@@ -10,31 +10,21 @@ namespace kiss
 class IpcMessage
 {
   public:
-    enum class MsgState
+    IpcMessage()
+        : mMessageData(nullptr), //
+          mMessageSize(0)
     {
-        INIT,
-        PRODUCED,
-        CONSUMED,
-        SKIP
-    };
-
-    uint8_t *getBuffer()
-    {
-        return (reinterpret_cast<uint8_t *>(this) + sizeof(IpcMessage));
     }
 
-  private:
-    IpcMessage(const uint32_t dataSize)
-        : mMsgState(IpcMessage::MsgState::INIT), //
+    IpcMessage(void *dataBuffer, const uint32_t dataSize) //
+        : mMessageData(dataBuffer),                       //
           mMessageSize(dataSize)
     {
     }
 
-    MsgState mMsgState; // TODO: needs to be IPC-atomic
+  private:
+    void *mMessageData;
     uint32_t mMessageSize;
-
-    // memory directly after the struct is used as data buffer
-    // uint8_t mBuffer[mMessageSize];
 
     friend class SimpleIpc;
 };
