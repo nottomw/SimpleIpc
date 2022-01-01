@@ -33,6 +33,7 @@ class SimpleIpc
     SystemWideLockIf &mSystemWideLock;
 
     // TODO: sane sizes
+    uint8_t *mSharedMemAllocatorRegion;
     Allocator mSharedMemBufferAllocator;
     RingBuffer<IpcMessage, 100> *mRbProducerConsumerQueue; // placed in shared memory
 };

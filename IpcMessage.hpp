@@ -11,19 +11,19 @@ class IpcMessage
 {
   public:
     IpcMessage()
-        : mMessageData(nullptr), //
+        : mMessageData(0), //
           mMessageSize(0)
     {
     }
 
-    IpcMessage(void *dataBuffer, const uint32_t dataSize) //
-        : mMessageData(dataBuffer),                       //
+    IpcMessage(uint32_t dataBuffer, const uint32_t dataSize) //
+        : mMessageData(dataBuffer),                          //
           mMessageSize(dataSize)
     {
     }
 
   private:
-    void *mMessageData;
+    uint32_t mMessageData; // data = sharedMem base + mMessageData
     uint32_t mMessageSize;
 
     friend class SimpleIpc;

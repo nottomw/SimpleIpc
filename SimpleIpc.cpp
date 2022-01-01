@@ -10,10 +10,11 @@
 namespace kiss
 {
 
-SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock) //
-    : mSharedMemory(sharedMemory),                                              //
-      mSystemWideLock(systemWideLock),                                          //
-      mSharedMemBufferAllocator(mSharedMemory.mSharedMemoryAddr + sizeof(RingBuffer<IpcMessage, 100>), 1024)
+SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock)                         //
+    : mSharedMemory(sharedMemory),                                                                      //
+      mSystemWideLock(systemWideLock),                                                                  //
+      mSharedMemAllocatorRegion(mSharedMemory.mSharedMemoryAddr + sizeof(RingBuffer<IpcMessage, 100>)), //
+      mSharedMemBufferAllocator(mSharedMemAllocatorRegion, 1024)
 {
     // TODO: correct sizes of allocator region and queue
     mRbProducerConsumerQueue = //
@@ -22,14 +23,10 @@ SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock) 
 
 SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t messageSize)
 {
-    void *pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
-    if (pushedAddr == nullptr)
-    {
-        // TODO
-        return Result::ERR_GENERAL;
-    }
+    Allocator::RelativePtr pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
 
-    (void)memcpy(pushedAddr, message, messageSize);
+    void *addr = mSharedMemAllocatorRegion + pushedAddr;
+    (void)memcpy(addr, message, messageSize);
 
     IpcMessage messageToSend{pushedAddr, messageSize};
     // TODO: fix horrible address fetch
@@ -44,19 +41,20 @@ SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t 
 
 SimpleIpc::Result SimpleIpc::receiveMessage(uint8_t *const message, const uint32_t &messageSize)
 {
-    IpcMessage *receivedMessage = nullptr;
-    const auto queuePopRes = mRbProducerConsumerQueue->pop(receivedMessage);
+    IpcMessage receivedMessage;
+    const auto queuePopRes = mRbProducerConsumerQueue->pop(&receivedMessage);
     if (queuePopRes != RingBufferResult::OK)
     {
         return Result::ERR_GENERAL;
     }
 
     // TODO: size check
-    assert(receivedMessage->mMessageSize <= messageSize);
+    assert(receivedMessage.mMessageSize <= messageSize);
 
-    (void)memcpy(message, receivedMessage->mMessageData, messageSize);
+    void *addr = mSharedMemAllocatorRegion + receivedMessage.mMessageData;
+    (void)memcpy(message, addr, messageSize);
 
-    mSharedMemBufferAllocator.dealloc(receivedMessage->mMessageData);
+    mSharedMemBufferAllocator.dealloc(receivedMessage.mMessageData);
 
     return Result::OK;
 }
