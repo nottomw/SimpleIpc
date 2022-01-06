@@ -2,13 +2,102 @@
 
 #include <cassert>
 #include <cstdio>
+#include <new>
 
 namespace kiss
 {
 
-RelativeAllocator::RelativeAllocator(const uint32_t memoryRegionSize) : mMemoryRegionSize(memoryRegionSize)
+// TODO: array wrapper, similar to std::array<>
+
+RelativeAllocator::MemoryRegion &RelativeAllocator::arrEmplace(MemoryRegion *const arr,                  //
+                                                               uint32_t *arrTail,                        //
+                                                               const RelativeAllocator::RelativePtr ptr, //
+                                                               const uint32_t size)
 {
-    mRegionsFree.emplace(0, memoryRegionSize);
+    // TODO: size check
+    // TODO: not thread/ipc safe
+
+    arr[*arrTail].ptr = ptr;
+    arr[*arrTail].size = size;
+
+    MemoryRegion &emplaced = arr[*arrTail];
+
+    *arrTail += 1U;
+
+    return emplaced;
+}
+
+void RelativeAllocator::arrErase(MemoryRegion *const arr, //
+                                 uint32_t &arrTail,       //
+                                 const MemoryRegion &region)
+{
+    assert(arrTail != 0);
+
+    for (uint32_t i = 0U; i < arrTail; ++i)
+    {
+        // size check just to make sure
+        if ((arr[i].ptr == region.ptr) && (arr[i].size == region.size))
+        {
+            const uint32_t lastEntryIdx = arrTail - 1U;
+
+            if (i != lastEntryIdx)
+            {
+                // replace the removed entry with the last entry
+                arr[i].ptr = arr[lastEntryIdx].ptr;
+                arr[i].size = arr[lastEntryIdx].size;
+            }
+
+            arrTail -= 1;
+
+            break;
+        }
+    }
+}
+
+RelativeAllocator::MemoryRegion *RelativeAllocator::arrFindPtr(MemoryRegion *const arr, //
+                                                               uint32_t &arrTail,       //
+                                                               const RelativePtr &ptr)
+{
+    for (uint32_t i = 0U; i < arrTail; ++i)
+    {
+        auto &it = arr[i];
+        const bool ptrInRange = //
+            (ptr >= it.ptr) &&  //
+            (ptr < (it.ptr + it.size));
+
+        if (ptrInRange)
+        {
+            return &it;
+        }
+    }
+
+    return nullptr;
+}
+
+RelativeAllocator::RelativeAllocator(uint8_t *const allocatorInternalSharedMem,     //
+                                     const uint32_t allocatorInternalSharedMemSize, //
+                                     const uint32_t memoryRegionSize)
+    : mSharedMem(allocatorInternalSharedMem), //
+      mMemoryRegionSize(memoryRegionSize)
+{
+    // all buckets are divided to two arrays - managing "used" and "free" memory
+    constexpr uint32_t bookkeepingArraysCount = 2U;
+    const uint32_t tailsSize = bookkeepingArraysCount * sizeof(*mRegionsFreeTail);
+    const uint32_t numberOfBuckets =
+        (allocatorInternalSharedMemSize - tailsSize) / sizeof(MemoryRegion) / bookkeepingArraysCount;
+
+    // place the memory bookkeeping structures in shared memory
+    uint8_t *const freeArrayAddr = mSharedMem;
+    mRegionsFreeTail = new (freeArrayAddr) uint32_t;
+    *mRegionsFreeTail = 0U;
+    mRegionsFree = new (freeArrayAddr + sizeof(*mRegionsFreeTail)) MemoryRegion[numberOfBuckets];
+
+    uint8_t *const usedArrayAddr = mSharedMem + (numberOfBuckets * sizeof(MemoryRegion));
+    mRegionsUsedTail = new (usedArrayAddr) uint32_t;
+    *mRegionsUsedTail = 0U;
+    mRegionsUsed = new (usedArrayAddr + sizeof(*mRegionsUsedTail)) MemoryRegion[numberOfBuckets];
+
+    arrEmplace(mRegionsFree, mRegionsFreeTail, 0, memoryRegionSize);
 }
 
 RelativeAllocator::RelativePtr RelativeAllocator::alloc(const uint32_t sizeBytes)
@@ -16,22 +105,22 @@ RelativeAllocator::RelativePtr RelativeAllocator::alloc(const uint32_t sizeBytes
     bool allocSuccess = false;
     RelativePtr allocAddr = 0;
 
-    for (auto &it : mRegionsFree)
+    for (uint32_t i = 0U; i < *mRegionsFreeTail; ++i)
     {
+        auto &it = mRegionsFree[i];
+
         if (it.size > sizeBytes)
         {
-            printf("ALLOC: new ptr = %d, size = \n", it.ptr, sizeBytes);
-
-            mRegionsUsed.emplace(it.ptr, sizeBytes);
+            arrEmplace(mRegionsUsed, mRegionsUsedTail, it.ptr, sizeBytes);
             allocAddr = it.ptr;
 
             const uint32_t newFreeRegionSize = it.size - sizeBytes;
             if (newFreeRegionSize != 0)
             {
-                mRegionsFree.emplace((it.ptr + sizeBytes), newFreeRegionSize);
+                arrEmplace(mRegionsFree, mRegionsFreeTail, (it.ptr + sizeBytes), newFreeRegionSize);
             }
 
-            mRegionsFree.erase(it);
+            arrErase(mRegionsFree, *mRegionsFreeTail, it);
 
             allocSuccess = true;
 
@@ -42,24 +131,28 @@ RelativeAllocator::RelativePtr RelativeAllocator::alloc(const uint32_t sizeBytes
     // TODO: return error, assert for now...
     assert(allocSuccess);
 
-    printf("Allocated: %d\n", allocAddr);
-
     return allocAddr;
 }
 
 void RelativeAllocator::dealloc(const RelativeAllocator::RelativePtr ptr)
 {
-    printf("Dealloc: %d\n", ptr);
+    bool found = false;
 
-    auto it = mRegionsUsed.find(ptr);
-    if (it != mRegionsUsed.end())
+    for (uint32_t i = 0U; i < *mRegionsUsedTail; ++i)
     {
-        mRegionsUsed.erase(it);
-        auto newMemRegion = mRegionsFree.emplace(it->ptr, it->size).first;
+        auto &it = mRegionsUsed[i];
+        if (it.ptr == ptr)
+        {
+            found = true;
 
-        tryToCoalesce(*newMemRegion);
+            arrErase(mRegionsUsed, *mRegionsUsedTail, it);
+
+            auto &newMemRegion = arrEmplace(mRegionsFree, mRegionsFreeTail, it.ptr, it.size);
+            tryToCoalesce(newMemRegion);
+        }
     }
-    else
+
+    if (!found)
     {
         assert("tried to free invalid ptr" == nullptr);
     }
@@ -74,31 +167,35 @@ void RelativeAllocator::tryToCoalesce(const MemoryRegion &freedMemRegion)
     // find free regions before
     if (memRegionToCoalesce.ptr != 0)
     {
-        auto freeRegionBefore = mRegionsFree.find(memRegionToCoalesce.ptr - 1U);
-        if (freeRegionBefore != mRegionsFree.end())
+        MemoryRegion *const freeRegionBefore =
+            arrFindPtr(mRegionsFree, *mRegionsFreeTail, memRegionToCoalesce.ptr - 1U);
+        if (freeRegionBefore != nullptr)
         {
-            mRegionsFree.erase(freeRegionBefore);
+            arrErase(mRegionsFree, *mRegionsFreeTail, *freeRegionBefore);
+            arrErase(mRegionsFree, *mRegionsFreeTail, freedMemRegion);
 
             const uint32_t newFreeRegionSize = freeRegionBefore->size + memRegionToCoalesce.size;
             memRegionToCoalesce.ptr = freeRegionBefore->ptr;
             memRegionToCoalesce.size = newFreeRegionSize;
 
-            mRegionsFree.emplace(memRegionToCoalesce);
+            (void)arrEmplace(mRegionsFree, mRegionsFreeTail, freeRegionBefore->ptr, newFreeRegionSize);
         }
     }
 
     // find free regions after
     if ((memRegionToCoalesce.ptr + memRegionToCoalesce.size + 1) < mMemoryRegionSize)
     {
-        auto freeRegionAfter = mRegionsFree.find(memRegionToCoalesce.ptr + memRegionToCoalesce.size + 1);
-        if (freeRegionAfter != mRegionsFree.end())
+        MemoryRegion *const freeRegionBefore =
+            arrFindPtr(mRegionsFree, *mRegionsFreeTail, memRegionToCoalesce.ptr + memRegionToCoalesce.size + 1);
+        if (freeRegionBefore != nullptr)
         {
-            mRegionsFree.erase(freeRegionAfter);
+            arrErase(mRegionsFree, *mRegionsFreeTail, *freeRegionBefore);
+            arrErase(mRegionsFree, *mRegionsFreeTail, freedMemRegion);
 
-            const uint32_t newFreeRegionSize = freeRegionAfter->size + memRegionToCoalesce.size;
+            const uint32_t newFreeRegionSize = freeRegionBefore->size + memRegionToCoalesce.size;
             memRegionToCoalesce.size = newFreeRegionSize;
 
-            mRegionsFree.emplace(memRegionToCoalesce);
+            (void)arrEmplace(mRegionsFree, mRegionsFreeTail, memRegionToCoalesce.ptr, newFreeRegionSize);
         }
     }
 }

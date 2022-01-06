@@ -12,7 +12,9 @@ class RelativeAllocator
   public:
     using RelativePtr = uint32_t;
 
-    RelativeAllocator(const uint32_t memoryRegionSize);
+    RelativeAllocator(uint8_t *const allocatorInternalSharedMem,     //
+                      const uint32_t allocatorInternalSharedMemSize, //
+                      const uint32_t memoryRegionSize);
 
     RelativePtr alloc(const uint32_t sizeBytes);
     void dealloc(const RelativePtr ptr);
@@ -20,6 +22,13 @@ class RelativeAllocator
   private:
     struct MemoryRegion
     {
+        MemoryRegion()
+            : ptr(0), //
+              size(0)
+
+        {
+        }
+
         MemoryRegion(const RelativePtr ptr, const uint32_t size) //
             : ptr(ptr),                                          //
               size(size)
@@ -36,43 +45,28 @@ class RelativeAllocator
         uint32_t size;
     };
 
-    struct MemoryRegionCompare
-    {
-        // use the stdlib set is_transparent feature
-        using is_transparent = void;
-
-        bool isLess(const uint32_t left, const uint32_t leftSize, const uint32_t right) const
-        {
-            uint32_t size = leftSize;
-            if (size != 0)
-            {
-                size -= 1;
-            }
-
-            return ((left + size) < right);
-        }
-
-        bool operator()(const MemoryRegion &left, const MemoryRegion &right) const
-        {
-            return isLess(left.ptr, left.size, right.ptr);
-        }
-
-        bool operator()(const MemoryRegion &left, const uint32_t relativePtr) const
-        {
-            return isLess(left.ptr, left.size, relativePtr);
-        }
-
-        bool operator()(const uint32_t relativePtr, const MemoryRegion &right) const
-        {
-            return isLess(relativePtr, 0, right.ptr);
-        }
-    };
-
     void tryToCoalesce(const MemoryRegion &freedMemRegion);
 
-    std::set<MemoryRegion, MemoryRegionCompare> mRegionsFree;
-    std::set<MemoryRegion, MemoryRegionCompare> mRegionsUsed;
+    MemoryRegion &arrEmplace(MemoryRegion *const arr,                  //
+                             uint32_t *arrTail,                        //
+                             const RelativeAllocator::RelativePtr ptr, //
+                             const uint32_t size);
 
+    void arrErase(MemoryRegion *const arr, //
+                  uint32_t &arrTail,       //
+                  const MemoryRegion &region);
+
+    MemoryRegion *arrFindPtr(MemoryRegion *const arr, //
+                             uint32_t &arrTail,       //
+                             const RelativePtr &ptr);
+
+    MemoryRegion *mRegionsFree; // raw array
+    uint32_t *mRegionsFreeTail;
+
+    MemoryRegion *mRegionsUsed; // raw array
+    uint32_t *mRegionsUsedTail;
+
+    uint8_t *const mSharedMem;
     uint32_t mMemoryRegionSize;
 };
 

@@ -10,15 +10,15 @@
 namespace kiss
 {
 
-SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock)                         //
-    : mSharedMemory(sharedMemory),                                                                      //
-      mSystemWideLock(systemWideLock),                                                                  //
-      mSharedMemAllocatorRegion(mSharedMemory.mSharedMemoryAddr + sizeof(RingBuffer<IpcMessage, 100>)), //
-      mSharedMemBufferAllocator(1024)
+SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock)                                //
+    : mSharedMemory(sharedMemory),                                                                             //
+      mSystemWideLock(systemWideLock),                                                                         //
+      mSharedMemAllocatorRegion(mSharedMemory.mSharedMemoryAddr + 1024 + sizeof(RingBuffer<IpcMessage, 100>)), //
+      mSharedMemBufferAllocator(mSharedMemory.mSharedMemoryAddr, 1024, 1024)
 {
-    // TODO: correct sizes of allocator region and queue
+    // TODO: correct sizes of allocator region and queue - magic numbers
     mRbProducerConsumerQueue = //
-        new (mSharedMemory.mSharedMemoryAddr) RingBuffer<IpcMessage, 100>;
+        new (mSharedMemory.mSharedMemoryAddr + 1024) RingBuffer<IpcMessage, 100>;
 }
 
 SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t messageSize)

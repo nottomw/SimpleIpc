@@ -20,8 +20,6 @@ SharedMem::SharedMem(const uint32_t sharedMemSize)
     const uint32_t pageSize = sysconf(_SC_PAGE_SIZE);
     const uint32_t alignedSize = sharedMemSize + (pageSize - (sharedMemSize % pageSize));
 
-    printf("algn size = %d, user size = %d\n", alignedSize, sharedMemSize);
-
     shmFd = shm_open(SHM_OBJ_NAME, O_RDWR | O_CREAT, 0777);
     assert(shmFd != -1);
 
