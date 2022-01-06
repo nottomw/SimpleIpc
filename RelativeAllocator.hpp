@@ -1,7 +1,6 @@
 #ifndef RELATIVEALLOCATOR_HPP
 #define RELATIVEALLOCATOR_HPP
 
-#include <cassert>
 #include <cstdint>
 #include <set>
 
@@ -69,7 +68,7 @@ class RelativeAllocator
         }
     };
 
-    void coalesce(const MemoryRegion &freeMemRegion);
+    void tryToCoalesce(const MemoryRegion &freedMemRegion);
 
     std::set<MemoryRegion, MemoryRegionCompare> mRegionsFree;
     std::set<MemoryRegion, MemoryRegionCompare> mRegionsUsed;

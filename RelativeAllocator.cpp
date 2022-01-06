@@ -1,5 +1,8 @@
 #include "RelativeAllocator.hpp"
 
+#include <cassert>
+#include <cstdio>
+
 namespace kiss
 {
 
@@ -17,6 +20,8 @@ RelativeAllocator::RelativePtr RelativeAllocator::alloc(const uint32_t sizeBytes
     {
         if (it.size > sizeBytes)
         {
+            printf("ALLOC: new ptr = %d, size = \n", it.ptr, sizeBytes);
+
             mRegionsUsed.emplace(it.ptr, sizeBytes);
             allocAddr = it.ptr;
 
@@ -37,18 +42,22 @@ RelativeAllocator::RelativePtr RelativeAllocator::alloc(const uint32_t sizeBytes
     // TODO: return error, assert for now...
     assert(allocSuccess);
 
+    printf("Allocated: %d\n", allocAddr);
+
     return allocAddr;
 }
 
 void RelativeAllocator::dealloc(const RelativeAllocator::RelativePtr ptr)
 {
+    printf("Dealloc: %d\n", ptr);
+
     auto it = mRegionsUsed.find(ptr);
     if (it != mRegionsUsed.end())
     {
         mRegionsUsed.erase(it);
         auto newMemRegion = mRegionsFree.emplace(it->ptr, it->size).first;
 
-        coalesce(*newMemRegion);
+        tryToCoalesce(*newMemRegion);
     }
     else
     {
@@ -56,11 +65,11 @@ void RelativeAllocator::dealloc(const RelativeAllocator::RelativePtr ptr)
     }
 }
 
-void RelativeAllocator::coalesce(const MemoryRegion &freeMemRegion)
+void RelativeAllocator::tryToCoalesce(const MemoryRegion &freedMemRegion)
 {
-    // if possible coalesce the freedPtr with adjacent free memory
+    // if possible coalesce the freed MemRegion with adjacent free memory
 
-    MemoryRegion memRegionToCoalesce{freeMemRegion};
+    MemoryRegion memRegionToCoalesce{freedMemRegion};
 
     // find free regions before
     if (memRegionToCoalesce.ptr != 0)
@@ -68,7 +77,28 @@ void RelativeAllocator::coalesce(const MemoryRegion &freeMemRegion)
         auto freeRegionBefore = mRegionsFree.find(memRegionToCoalesce.ptr - 1U);
         if (freeRegionBefore != mRegionsFree.end())
         {
-            // coalesce
+            mRegionsFree.erase(freeRegionBefore);
+
+            const uint32_t newFreeRegionSize = freeRegionBefore->size + memRegionToCoalesce.size;
+            memRegionToCoalesce.ptr = freeRegionBefore->ptr;
+            memRegionToCoalesce.size = newFreeRegionSize;
+
+            mRegionsFree.emplace(memRegionToCoalesce);
+        }
+    }
+
+    // find free regions after
+    if ((memRegionToCoalesce.ptr + memRegionToCoalesce.size + 1) < mMemoryRegionSize)
+    {
+        auto freeRegionAfter = mRegionsFree.find(memRegionToCoalesce.ptr + memRegionToCoalesce.size + 1);
+        if (freeRegionAfter != mRegionsFree.end())
+        {
+            mRegionsFree.erase(freeRegionAfter);
+
+            const uint32_t newFreeRegionSize = freeRegionAfter->size + memRegionToCoalesce.size;
+            memRegionToCoalesce.size = newFreeRegionSize;
+
+            mRegionsFree.emplace(memRegionToCoalesce);
         }
     }
 }
