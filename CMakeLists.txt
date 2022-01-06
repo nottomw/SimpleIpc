@@ -7,6 +7,7 @@ project(SimpleIpcLib CXX)
 add_library(SimpleIpcLib STATIC
     SimpleIpc.cpp
     SharedMem.cpp
+    RelativeAllocator.cpp
 )
 
 add_library(SimpleIpcLib::SimpleIpcLib ALIAS SimpleIpcLib)

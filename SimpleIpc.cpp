@@ -14,7 +14,7 @@ SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock) 
     : mSharedMemory(sharedMemory),                                                                      //
       mSystemWideLock(systemWideLock),                                                                  //
       mSharedMemAllocatorRegion(mSharedMemory.mSharedMemoryAddr + sizeof(RingBuffer<IpcMessage, 100>)), //
-      mSharedMemBufferAllocator(mSharedMemAllocatorRegion, 1024)
+      mSharedMemBufferAllocator(1024)
 {
     // TODO: correct sizes of allocator region and queue
     mRbProducerConsumerQueue = //
@@ -23,7 +23,7 @@ SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock) 
 
 SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t messageSize)
 {
-    Allocator::RelativePtr pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
+    RelativeAllocator::RelativePtr pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
 
     void *addr = mSharedMemAllocatorRegion + pushedAddr;
     (void)memcpy(addr, message, messageSize);

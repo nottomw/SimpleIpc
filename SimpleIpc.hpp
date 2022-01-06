@@ -3,8 +3,8 @@
 
 #include <cstdint>
 
-#include "Allocator.hpp"
 #include "IpcMessage.hpp"
+#include "RelativeAllocator.hpp"
 #include "RingBuffer.hpp"
 #include "SharedMem.hpp"
 
@@ -34,7 +34,7 @@ class SimpleIpc
 
     // TODO: sane sizes
     uint8_t *mSharedMemAllocatorRegion;
-    Allocator mSharedMemBufferAllocator;
+    RelativeAllocator mSharedMemBufferAllocator;
     RingBuffer<IpcMessage, 100> *mRbProducerConsumerQueue; // placed in shared memory
 };
 

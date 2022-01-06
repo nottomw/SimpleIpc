@@ -4,7 +4,8 @@
 #include <array>
 #include <cstring>
 
-// TODO: namespace kiss
+namespace kiss
+{
 
 enum class RingBufferResult
 {
@@ -13,7 +14,8 @@ enum class RingBufferResult
     ERR_EMPTY
 };
 
-template <typename T, size_t Size> class RingBuffer
+template <typename T, size_t Size> //
+class RingBuffer
 {
     // One entry wasted as "buffer full" marker.
     static constexpr size_t SizeWithPadding = Size + 1;
@@ -122,5 +124,7 @@ template <typename T, size_t Size> class RingBuffer
 
     std::array<T, SizeWithPadding> ringBuffer;
 };
+
+} // namespace kiss
 
 #endif // RINGBUFFER_HPP
