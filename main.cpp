@@ -25,13 +25,14 @@ class DummySystemWideLock : public kiss::SystemWideLockIf
 
 int main(int argc, char **)
 {
-    kiss::SharedMem mem(128);
+    kiss::SharedMem metaMem("/shm_meta", 2048);
+    kiss::SharedMem mem("shm_data", 5120);
     DummySystemWideLock systemLock;
 
     if (argc <= 1)
     {
         printf("CONSUMER\n");
-        kiss::SimpleIpc ipcConsumer(mem, systemLock);
+        kiss::SimpleIpc ipcConsumer(metaMem, mem, systemLock);
 
         while (true)
         {
@@ -54,7 +55,7 @@ int main(int argc, char **)
     else
     {
         printf("PRODUCER\n");
-        kiss::SimpleIpc ipcProducer(mem, systemLock);
+        kiss::SimpleIpc ipcProducer(metaMem, mem, systemLock);
 
         while (true)
         {

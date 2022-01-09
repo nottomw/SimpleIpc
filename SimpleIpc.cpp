@@ -10,26 +10,42 @@
 namespace kiss
 {
 
-SimpleIpc::SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &systemWideLock)                                //
-    : mSharedMemory(sharedMemory),                                                                             //
-      mSystemWideLock(systemWideLock),                                                                         //
-      mSharedMemAllocatorRegion(mSharedMemory.mSharedMemoryAddr + 1024 + sizeof(RingBuffer<IpcMessage, 100>)), //
-      mSharedMemBufferAllocator(mSharedMemory.mSharedMemoryAddr, 1024, 1024)
+SimpleIpc::SimpleIpc(SharedMem &sharedMemoryMetadata, SharedMem &sharedMemoryData, SystemWideLockIf &systemWideLock) //
+    : mSharedMemoryData(sharedMemoryData),                                                                           //
+      mSystemWideLock(systemWideLock),                                                                               //
+      mSharedMemBufferAllocator(sharedMemoryMetadata.mSharedMemoryAddr,                                              //
+                                sharedMemoryMetadata.getSize() / 2U,                                                 //
+                                mSharedMemoryData.getSize())
 {
-    // TODO: correct sizes of allocator region and queue - magic numbers
-    mRbProducerConsumerQueue = //
-        new (mSharedMemory.mSharedMemoryAddr + 1024) RingBuffer<IpcMessage, 100>;
+    // shared memory use:
+    //  - [metadata] allocator metadata
+    //  - [metadata + sizeof allocator meta] producer-consumer queue (ring buffer)
+    //  - [data] data buffers
+
+    // TODO: fix magic number: 100
+    using RB = RingBuffer<IpcMessage, 100>;
+
+    // divide the metadata size to two regions: queue & allocator
+    const uint32_t queueShmemSize = sharedMemoryMetadata.getSize() / 2U;
+    const uint32_t allocatorShmemSize = queueShmemSize;
+    constexpr uint32_t allocatorMinShmemSize = 10U * sizeof(MemoryRegion);
+
+    assert(allocatorShmemSize >= allocatorMinShmemSize);
+    assert(sizeof(RB) <= queueShmemSize);
+
+    uint8_t *const queueSharedMem = sharedMemoryMetadata.mSharedMemoryAddr + allocatorShmemSize;
+
+    mRbProducerConsumerQueue = new (queueSharedMem) RB;
 }
 
 SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t messageSize)
 {
     RelativeAllocator::RelativePtr pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
 
-    void *addr = mSharedMemAllocatorRegion + pushedAddr;
+    void *addr = mSharedMemoryData.mSharedMemoryAddr + pushedAddr;
     (void)memcpy(addr, message, messageSize);
 
     IpcMessage messageToSend{pushedAddr, messageSize};
-    // TODO: fix horrible address fetch
     const auto queuePushRes = mRbProducerConsumerQueue->push(&messageToSend);
     if (queuePushRes != RingBufferResult::OK)
     {
@@ -48,10 +64,12 @@ SimpleIpc::Result SimpleIpc::receiveMessage(uint8_t *const message, const uint32
         return Result::ERR_GENERAL;
     }
 
-    // TODO: size check
-    assert(receivedMessage.mMessageSize <= messageSize);
+    if (receivedMessage.mMessageSize > messageSize)
+    {
+        return Result::ERR_BUFFER_TOO_SMALL;
+    }
 
-    void *addr = mSharedMemAllocatorRegion + receivedMessage.mMessageData;
+    void *addr = mSharedMemoryData.mSharedMemoryAddr + receivedMessage.mMessageData;
     (void)memcpy(message, addr, messageSize);
 
     mSharedMemBufferAllocator.dealloc(receivedMessage.mMessageData);

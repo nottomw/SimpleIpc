@@ -7,9 +7,9 @@
 namespace kiss
 {
 
-RelativeAllocator::MemoryRegion *RelativeAllocator::arrFindPtr(MemoryRegion *const arr, //
-                                                               uint32_t &arrTail,       //
-                                                               const RelativePtr &ptr)
+MemoryRegion *RelativeAllocator::arrFindPtr(MemoryRegion *const arr, //
+                                            uint32_t &arrTail,       //
+                                            const RelativePtr &ptr)
 {
     for (uint32_t i = 0U; i < arrTail; ++i)
     {

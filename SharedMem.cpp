@@ -12,15 +12,14 @@ namespace kiss
 {
 
 // linux-only for now
-#define SHM_OBJ_NAME "/shmem_test"
 
-SharedMem::SharedMem(const uint32_t sharedMemSize)
+SharedMem::SharedMem(const char *const name, const uint32_t sharedMemSize) //
+    : mSharedMemName(name)
 {
-
     const uint32_t pageSize = sysconf(_SC_PAGE_SIZE);
     const uint32_t alignedSize = sharedMemSize + (pageSize - (sharedMemSize % pageSize));
 
-    shmFd = shm_open(SHM_OBJ_NAME, O_RDWR | O_CREAT, 0777);
+    shmFd = shm_open(mSharedMemName, O_RDWR | O_CREAT, 0777);
     assert(shmFd != -1);
 
     const int ftruncRes = ftruncate(shmFd, alignedSize);
@@ -32,7 +31,8 @@ SharedMem::SharedMem(const uint32_t sharedMemSize)
     mSharedMemSize = sharedMemSize;
 }
 
-SharedMem::SharedMem(void *const sharedMemAddr, const uint32_t sharedMemSize)
+SharedMem::SharedMem(void *const sharedMemAddr, const uint32_t sharedMemSize) //
+    : mSharedMemName("")
 {
     mSharedMemSize = sharedMemSize;
     mSharedMemoryAddr = static_cast<uint8_t *>(sharedMemAddr);
@@ -41,7 +41,7 @@ SharedMem::SharedMem(void *const sharedMemAddr, const uint32_t sharedMemSize)
 SharedMem::~SharedMem()
 {
     (void)munmap(mSharedMemoryAddr, mSharedMemSize);
-    (void)shm_unlink(SHM_OBJ_NAME);
+    (void)shm_unlink(mSharedMemName);
 }
 
 uint32_t SharedMem::getSize() const

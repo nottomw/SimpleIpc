@@ -9,7 +9,7 @@ namespace kiss
 class SharedMem
 {
   public:
-    SharedMem(const uint32_t sharedMemSize);
+    SharedMem(const char *const name, const uint32_t sharedMemSize);
     SharedMem(void *const sharedMemAddr, const uint32_t sharedMemSize);
     ~SharedMem();
 
@@ -20,6 +20,7 @@ class SharedMem
     uint8_t *mSharedMemoryAddr;
 
     int shmFd;
+    const char *const mSharedMemName;
 
     friend class SimpleIpc;
 };

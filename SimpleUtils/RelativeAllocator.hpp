@@ -9,6 +9,8 @@
 namespace kiss
 {
 
+struct MemoryRegion;
+
 class RelativeAllocator
 {
   public:
@@ -22,44 +24,6 @@ class RelativeAllocator
     void dealloc(const RelativePtr ptr);
 
   private:
-    struct MemoryRegion
-    {
-        MemoryRegion()
-            : ptr(0), //
-              size(0)
-
-        {
-        }
-
-        MemoryRegion(const RelativePtr ptr, const uint32_t size) //
-            : ptr(ptr),                                          //
-              size(size)
-        {
-        }
-
-        MemoryRegion(const MemoryRegion &region)
-            : ptr(region.ptr), //
-              size(region.size)
-        {
-        }
-
-        MemoryRegion &operator=(MemoryRegion &&oth)
-        {
-            ptr = oth.ptr;
-            size = oth.size;
-
-            return *this;
-        }
-
-        bool operator==(const MemoryRegion &oth)
-        {
-            return ((ptr == oth.ptr) && (size == oth.size));
-        }
-
-        RelativePtr ptr;
-        uint32_t size;
-    };
-
     void tryToCoalesce(const MemoryRegion &freedMemRegion);
 
     MemoryRegion *arrFindPtr(MemoryRegion *const arr, //
@@ -76,6 +40,48 @@ class RelativeAllocator
 
     uint8_t *const mSharedMem;
     uint32_t mMemoryRegionSize;
+};
+
+struct MemoryRegion
+{
+  public:
+    MemoryRegion()
+        : ptr(0), //
+          size(0)
+
+    {
+    }
+
+    MemoryRegion(const RelativeAllocator::RelativePtr ptr, const uint32_t size) //
+        : ptr(ptr),                                                             //
+          size(size)
+    {
+    }
+
+    MemoryRegion(const MemoryRegion &region)
+        : ptr(region.ptr), //
+          size(region.size)
+    {
+    }
+
+    MemoryRegion &operator=(MemoryRegion &&oth)
+    {
+        ptr = oth.ptr;
+        size = oth.size;
+
+        return *this;
+    }
+
+    bool operator==(const MemoryRegion &oth)
+    {
+        return ((ptr == oth.ptr) && (size == oth.size));
+    }
+
+  private:
+    RelativeAllocator::RelativePtr ptr;
+    uint32_t size;
+
+    friend class RelativeAllocator;
 };
 
 } // namespace kiss

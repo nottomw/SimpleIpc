@@ -20,20 +20,19 @@ class SimpleIpc
     {
         OK,
         ERR_GENERAL,
-        ERR_NO_MSG
+        ERR_NO_MSG,
+        ERR_BUFFER_TOO_SMALL
     };
 
-    SimpleIpc(SharedMem &sharedMemory, SystemWideLockIf &mSystemWideLock);
+    SimpleIpc(SharedMem &sharedMemoryMetadata, SharedMem &sharedMemoryData, SystemWideLockIf &mSystemWideLock);
 
     Result sendMessage(uint8_t *const message, const uint32_t messageSize);
     Result receiveMessage(uint8_t *const message, const uint32_t &messageSize);
 
   private:
-    SharedMem &mSharedMemory;
+    SharedMem &mSharedMemoryData;
     SystemWideLockIf &mSystemWideLock;
 
-    // TODO: sane sizes
-    uint8_t *mSharedMemAllocatorRegion;
     RelativeAllocator mSharedMemBufferAllocator;
     RingBuffer<IpcMessage, 100> *mRbProducerConsumerQueue; // placed in shared memory
 };
