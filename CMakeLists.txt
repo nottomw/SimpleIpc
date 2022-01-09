@@ -4,13 +4,19 @@ include(CompilerOptions.cmake)
 
 project(SimpleIpcLib CXX)
 
+add_subdirectory(SimpleUtils)
+
 add_library(SimpleIpcLib STATIC
     SimpleIpc.cpp
     SharedMem.cpp
-    RelativeAllocator.cpp
 )
 
 add_library(SimpleIpcLib::SimpleIpcLib ALIAS SimpleIpcLib)
+
+target_link_libraries(SimpleIpcLib
+    PRIVATE
+        SimpleUtils::SimpleUtils
+)
 
 # Test exec
 add_executable(SimpleIpc

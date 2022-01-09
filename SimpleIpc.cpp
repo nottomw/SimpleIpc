@@ -1,6 +1,6 @@
 #include "IpcMessage.hpp"
-#include "RingBuffer.hpp"
 #include "SimpleIpc.hpp"
+#include "SimpleUtils/RingBuffer.hpp"
 
 #include <cassert>
 #include <cerrno>

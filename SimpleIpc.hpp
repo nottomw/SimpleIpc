@@ -4,9 +4,9 @@
 #include <cstdint>
 
 #include "IpcMessage.hpp"
-#include "RelativeAllocator.hpp"
-#include "RingBuffer.hpp"
 #include "SharedMem.hpp"
+#include "SimpleUtils/RelativeAllocator.hpp"
+#include "SimpleUtils/RingBuffer.hpp"
 
 namespace kiss
 {
