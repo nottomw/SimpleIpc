@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cassert>
 
 // TODO: add message produced callback (to signal other process/other core)
 
@@ -37,12 +38,10 @@ class DummySystemWideLock : public kiss::SystemWideLockIf
 
     virtual void unlock()
     {
-        bool exchangeDone = false;
-        do
-        {
-            uint32_t exp = LOCKED;
-            exchangeDone = lockAddr->compare_exchange_strong(exp, UNLOCKED);
-        } while (!exchangeDone);
+        uint32_t exp = LOCKED;
+        (void)lockAddr->compare_exchange_strong(exp, UNLOCKED);
+        
+        assert(exp == UNLOCKED);
     }
 
   private:
