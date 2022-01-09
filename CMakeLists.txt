@@ -6,24 +6,24 @@ project(SimpleIpcLib CXX)
 
 add_subdirectory(SimpleUtils)
 
-add_library(SimpleIpcLib STATIC
+add_library(SimpleIpc STATIC
     SimpleIpc.cpp
     SharedMem.cpp
 )
 
-add_library(SimpleIpcLib::SimpleIpcLib ALIAS SimpleIpcLib)
+add_library(SimpleIpc::SimpleIpc ALIAS SimpleIpc)
 
-target_link_libraries(SimpleIpcLib
+target_link_libraries(SimpleIpc
     PRIVATE
         SimpleUtils::SimpleUtils
 )
 
-# Test exec
-add_executable(SimpleIpc
-    main.cpp
+# Test application
+add_executable(SimpleIpcTestApp
+    TestApp/main.cpp
 )
 
-target_link_libraries(SimpleIpc
+target_link_libraries(SimpleIpcTestApp
     PRIVATE
-        SimpleIpcLib::SimpleIpcLib
+        SimpleIpc::SimpleIpc
 )

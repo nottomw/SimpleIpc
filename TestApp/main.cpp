@@ -1,5 +1,5 @@
-#include "SimpleIpc.hpp"
-#include "SystemWideLockIf.hpp"
+#include "../SimpleIpc.hpp"
+#include "../SystemWideLockIf.hpp"
 
 #include <atomic>
 #include <iostream>
@@ -52,7 +52,7 @@ class DummySystemWideLock : public kiss::SystemWideLockIf
 int main(int argc, char **)
 {
     kiss::SharedMem metaMem("/shm_meta", 2048);
-    kiss::SharedMem mem("shm_data", 5120);
+    kiss::SharedMem mem("/shm_data", 5120);
     DummySystemWideLock systemLock;
 
     if (argc <= 1)
