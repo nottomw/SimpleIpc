@@ -46,7 +46,7 @@ class DummySystemWideLock : public kiss::SystemWideLockIf
     }
 
   private:
-    volatile std::atomic_uint32_t *lockAddr;
+    std::atomic_uint32_t *lockAddr;
 };
 
 int main(int argc, char **)
