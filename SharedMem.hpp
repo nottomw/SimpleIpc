@@ -14,6 +14,7 @@ class SharedMem
     ~SharedMem();
 
     uint32_t getSize() const;
+    uint8_t *getAddress() const;
 
   private:
     uint32_t mSharedMemSize;

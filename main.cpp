@@ -1,26 +1,52 @@
 #include "SimpleIpc.hpp"
 #include "SystemWideLockIf.hpp"
 
+#include <atomic>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <vector>
 
-// TODO: add message produced callback (to signall other process/other core)
+// TODO: add message produced callback (to signal other process/other core)
 
 class DummySystemWideLock : public kiss::SystemWideLockIf
 {
   public:
+    static constexpr uint32_t UNLOCKED = 0xB0B0B0B0U;
+    static constexpr uint32_t LOCKED = 0xFAFAFAFAU;
+
+    DummySystemWideLock()
+    {
+        static kiss::SharedMem lockMem("/shm_lock", sizeof(std::atomic_uint32_t));
+        lockAddr = new (lockMem.getAddress()) std::atomic_uint32_t;
+        lockAddr->store(UNLOCKED);
+    }
+
     virtual void lock()
     {
+        bool exchangeDone = false;
+        do
+        {
+            uint32_t exp = UNLOCKED;
+            exchangeDone = lockAddr->compare_exchange_strong(exp, LOCKED);
+        } while (!exchangeDone);
     }
 
     virtual void unlock()
     {
+        bool exchangeDone = false;
+        do
+        {
+            uint32_t exp = LOCKED;
+            exchangeDone = lockAddr->compare_exchange_strong(exp, UNLOCKED);
+        } while (!exchangeDone);
     }
+
+  private:
+    volatile std::atomic_uint32_t *lockAddr;
 };
 
 int main(int argc, char **)

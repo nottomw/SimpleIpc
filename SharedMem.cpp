@@ -49,4 +49,9 @@ uint32_t SharedMem::getSize() const
     return mSharedMemSize;
 }
 
+uint8_t *SharedMem::getAddress() const
+{
+    return mSharedMemoryAddr;
+}
+
 } // namespace kiss

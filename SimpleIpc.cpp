@@ -1,6 +1,7 @@
 #include "IpcMessage.hpp"
 #include "SimpleIpc.hpp"
 #include "SimpleUtils/RingBuffer.hpp"
+#include "SystemWideLockIf.hpp"
 
 #include <cassert>
 #include <cerrno>
@@ -40,13 +41,23 @@ SimpleIpc::SimpleIpc(SharedMem &sharedMemoryMetadata, SharedMem &sharedMemoryDat
 
 SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t messageSize)
 {
-    RelativeAllocator::RelativePtr pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
+    RelativeAllocator::RelativePtr pushedAddr{0};
+    {
+        LockScoped lk{mSystemWideLock};
+        pushedAddr = mSharedMemBufferAllocator.alloc(messageSize);
+    }
 
     void *addr = mSharedMemoryData.mSharedMemoryAddr + pushedAddr;
     (void)memcpy(addr, message, messageSize);
 
     IpcMessage messageToSend{pushedAddr, messageSize};
-    const auto queuePushRes = mRbProducerConsumerQueue->push(&messageToSend);
+
+    RingBufferResult queuePushRes = RingBufferResult::OK;
+    {
+        LockScoped lk{mSystemWideLock};
+        queuePushRes = mRbProducerConsumerQueue->push(&messageToSend);
+    }
+
     if (queuePushRes != RingBufferResult::OK)
     {
         return Result::ERR_GENERAL;
@@ -58,7 +69,13 @@ SimpleIpc::Result SimpleIpc::sendMessage(uint8_t *const message, const uint32_t 
 SimpleIpc::Result SimpleIpc::receiveMessage(uint8_t *const message, const uint32_t &messageSize)
 {
     IpcMessage receivedMessage;
-    const auto queuePopRes = mRbProducerConsumerQueue->pop(&receivedMessage);
+    RingBufferResult queuePopRes = RingBufferResult::OK;
+
+    {
+        LockScoped lk{mSystemWideLock};
+        queuePopRes = mRbProducerConsumerQueue->pop(&receivedMessage);
+    }
+
     if (queuePopRes != RingBufferResult::OK)
     {
         return Result::ERR_GENERAL;
@@ -72,7 +89,10 @@ SimpleIpc::Result SimpleIpc::receiveMessage(uint8_t *const message, const uint32
     void *addr = mSharedMemoryData.mSharedMemoryAddr + receivedMessage.mMessageData;
     (void)memcpy(message, addr, messageSize);
 
-    mSharedMemBufferAllocator.dealloc(receivedMessage.mMessageData);
+    {
+        LockScoped lk{mSystemWideLock};
+        mSharedMemBufferAllocator.dealloc(receivedMessage.mMessageData);
+    }
 
     return Result::OK;
 }
